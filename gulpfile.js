@@ -184,22 +184,20 @@ gulp.task("pack", async function(){
 });
 
 function getDistVersion(){
-	if (process.env.POTREE_DIST_VERSION) {
-		return process.env.POTREE_DIST_VERSION;
-	}
+	const packageJsonVersion = require('./package.json').version;
+	const envVersion = process.env.POTREE_DIST_VERSION;
+	let gitTagVersion = null;
 
 	try {
 		// Use the version tag on the current commit (wihtout the "v" prefix), if available
 		const {stdout, status} = spawnSync('git describe --tags --exact-match', {encoding: 'utf8', shell: true});
 		if (status == 0) {
-			return stdout.trim().replace(/^v/, '');
+			gitTagVersion = stdout.trim().replace(/^v/, '');
 		}
 
-	} catch (e) {
-		return require('./package.json').version;
-	}
+	} catch (e) {}
 
-	return require('./package.json').version;
+	return {packageJsonVersion, envVersion, gitTagVersion};
 }
 
 // Create the source for the "potree-dist" package in "build/dist",
@@ -210,6 +208,19 @@ gulp.task('dist', gulp.series(
 	'build',
 	'pack',
 	async function(done){
+		const {packageJsonVersion, envVersion, gitTagVersion} = getDistVersion();
+		if ((gitTagVersion && gitTagVersion != packageJsonVersion) || (envVersion && envVersion != packageJsonVersion)) {
+			console.log(
+				`Several set sources for the version disagree with each other:
+				environment: ${envVersion || "unset"}
+				git tag: ${gitTagVersion || "unset"}
+				package.json: ${packageJsonVersion}`
+			);
+			done(new Error("The version number sources disagree"));
+			return
+		}
+    const version = envVersion || gitTagVersion || packageJsonVersion;
+
 		const distDir = 'build/dist';
 		fs.rmSync(distDir, {recursive: true, force: true});
 		fs.mkdirSync(distDir, {recursive: true});
@@ -223,7 +234,7 @@ gulp.task('dist', gulp.series(
 		const pkg = {
 			name: '@potree/potree-dist',
 			publishConfig: {access: 'public'},
-			version: getDistVersion(),
+			version: version,
 			description: 'Prebuilt Potree WebGL point cloud viewer.',
 			keywords: ['point', 'cloud', 'pointcloud', 'octree', 'entwine', 'viewer', 'threejs', 'webgl', 'browser', 'tool'],
 			main: './build/potree/potree.js',

@@ -1,7 +1,7 @@
 
 const path = require('path');
 const gulp = require('gulp');
-const exec = require('child_process').exec;
+const {spawnSync} = require('child_process');
 
 const fs = require("fs");
 const fsp = fs.promises;
@@ -178,10 +178,9 @@ gulp.task('build',
 );
 
 gulp.task("pack", async function(){
-	exec('rollup -c', function (err, stdout, stderr) {
-		console.log(stdout);
-		console.log(stderr);
-	});
+	const {stdout, stderr} = spawnSync('rollup -c', {encoding: 'utf8', shell: true});
+	console.log(stdout);
+	console.log(stderr);
 });
 
 gulp.task('watch', gulp.parallel("build", "pack", "webserver", async function() {

@@ -19,6 +19,7 @@
   "scripts": {
     "start": "gulp watch",
     "build": "gulp build pack",
+    "dist": "gulp dist",
     "postinstall": "npm run build"
   },
   "dependencies": {

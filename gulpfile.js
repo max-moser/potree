@@ -183,6 +183,63 @@ gulp.task("pack", async function(){
 	console.log(stderr);
 });
 
+function getDistVersion(){
+	if (process.env.POTREE_DIST_VERSION) {
+		return process.env.POTREE_DIST_VERSION;
+	}
+
+	try {
+		// Use the version tag on the current commit (wihtout the "v" prefix), if available
+		const {stdout, status} = spawnSync('git describe --tags --exact-match', {encoding: 'utf8', shell: true});
+		if (status == 0) {
+			return stdout.trim().replace(/^v/, '');
+		}
+
+	} catch (e) {
+		return require('./package.json').version;
+	}
+
+	return require('./package.json').version;
+}
+
+// Create the source for the "potree-dist" package in "build/dist",
+// with the same layout as the original GitHub release ZIP.
+// The README and LICENSE get copied from the base repo,
+// and "package.json" gets generated.
+gulp.task('dist', gulp.series(
+	'build',
+	'pack',
+	async function(done){
+		const distDir = 'build/dist';
+		fs.rmSync(distDir, {recursive: true, force: true});
+		fs.mkdirSync(distDir, {recursive: true});
+
+		fs.cpSync('build/potree', path.join(distDir, 'build/potree'), {recursive: true});
+		fs.cpSync('libs', path.join(distDir, 'libs'), {recursive: true});
+
+		fs.copyFileSync('LICENSE', path.join(distDir, 'LICENSE'));
+		fs.copyFileSync('README.md', path.join(distDir, 'README.md'));
+
+		const pkg = {
+			name: '@potree/potree-dist',
+			publishConfig: {access: 'public'},
+			version: getDistVersion(),
+			description: 'Prebuilt Potree WebGL point cloud viewer.',
+			keywords: ['point', 'cloud', 'pointcloud', 'octree', 'entwine', 'viewer', 'threejs', 'webgl', 'browser', 'tool'],
+			main: './build/potree/potree.js',
+			license: 'BSD-2-CLAUSE',
+			repository: {type: 'git', url: 'git+https://github.com/potree/potree.git'},
+			author: 'Markus Schütz',
+			files: ['build', 'libs', 'LICENSE', 'README.md'],
+			scripts: {},
+		};
+
+		fs.writeFileSync(path.join(distDir, 'package.json'), JSON.stringify(pkg, null, '\t') + '\n');
+
+		done();
+	}
+));
+
 gulp.task('watch', gulp.parallel("build", "pack", "webserver", async function() {
 
 	let watchlist = [
